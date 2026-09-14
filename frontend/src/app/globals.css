@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #FAFAF7;
+  --paper-raised: #FFFFFF;
+  --ink: #1C2B39;
+  --ink-soft: #4A5A68;
+  --muted: #6B7280;
+  --hairline: #E4E1D8;
+  --ledger-green: #2F6F4E;
+  --ledger-green-soft: #E7F0EA;
+  --pen-red: #B23A2E;
+  --pen-red-soft: #FBEAE8;
+  --gold: #B8860B;
+  --gold-soft: #F7EFDD;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-muted: var(--muted);
+  --color-hairline: var(--hairline);
+  --color-ledger-green: var(--ledger-green);
+  --color-ledger-green-soft: var(--ledger-green-soft);
+  --color-pen-red: var(--pen-red);
+  --color-pen-red-soft: var(--pen-red-soft);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --font-serif: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.ledger-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.ledger-table th {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  text-align: left;
+  padding: 0.6rem 1rem;
+  border-bottom: 1.5px solid var(--ink);
+}
+
+.ledger-table td {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 0.9rem;
+}
+
+.ledger-table tbody tr:hover {
+  background: var(--ledger-green-soft);
+}
+
+.grade-stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 1rem;
+  transform: rotate(-4deg);
+}
