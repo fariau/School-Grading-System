@@ -77,6 +77,17 @@ def list_sessions(db: Session = Depends(get_db),
     return db.query(models.AcademicSession).all()
 
 
+@app.delete("/sessions/{session_id}")
+def delete_session(session_id: int, db: Session = Depends(get_db),
+                    current_user: models.User = Depends(auth.get_current_user)):
+    obj = db.query(models.AcademicSession).filter(models.AcademicSession.id == session_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Session not found")
+    db.delete(obj)
+    db.commit()
+    return {"detail": "Session deleted"}
+
+
 # ==================== CLASSES ====================
 
 @app.post("/classes", response_model=schemas.ClassOut)
@@ -93,6 +104,17 @@ def create_class(payload: schemas.ClassCreate, db: Session = Depends(get_db),
 def list_classes(db: Session = Depends(get_db),
                   current_user: models.User = Depends(auth.get_current_user)):
     return db.query(models.SchoolClass).all()
+
+
+@app.delete("/classes/{class_id}")
+def delete_class(class_id: int, db: Session = Depends(get_db),
+                  current_user: models.User = Depends(auth.get_current_user)):
+    obj = db.query(models.SchoolClass).filter(models.SchoolClass.id == class_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Class not found")
+    db.delete(obj)
+    db.commit()
+    return {"detail": "Class deleted"}
 
 
 # ==================== SECTIONS ====================
@@ -116,6 +138,17 @@ def list_sections(class_id: int = None, db: Session = Depends(get_db),
     return q.all()
 
 
+@app.delete("/sections/{section_id}")
+def delete_section(section_id: int, db: Session = Depends(get_db),
+                    current_user: models.User = Depends(auth.get_current_user)):
+    obj = db.query(models.Section).filter(models.Section.id == section_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Section not found")
+    db.delete(obj)
+    db.commit()
+    return {"detail": "Section deleted"}
+
+
 # ==================== SUBJECTS ====================
 
 @app.post("/subjects", response_model=schemas.SubjectOut)
@@ -135,6 +168,17 @@ def list_subjects(class_id: int = None, db: Session = Depends(get_db),
     if class_id:
         q = q.filter(models.Subject.class_id == class_id)
     return q.all()
+
+
+@app.delete("/subjects/{subject_id}")
+def delete_subject(subject_id: int, db: Session = Depends(get_db),
+                    current_user: models.User = Depends(auth.get_current_user)):
+    obj = db.query(models.Subject).filter(models.Subject.id == subject_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    db.delete(obj)
+    db.commit()
+    return {"detail": "Subject deleted"}
 
 
 # ==================== STUDENTS ====================
@@ -205,6 +249,17 @@ def list_exams(class_id: int = None, db: Session = Depends(get_db),
     if class_id:
         q = q.filter(models.Exam.class_id == class_id)
     return q.all()
+
+
+@app.delete("/exams/{exam_id}")
+def delete_exam(exam_id: int, db: Session = Depends(get_db),
+                 current_user: models.User = Depends(auth.get_current_user)):
+    obj = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    db.delete(obj)
+    db.commit()
+    return {"detail": "Exam deleted"}
 
 
 # ==================== MARKS ENTRY (core feature) ====================
@@ -370,7 +425,8 @@ def exam_dashboard(exam_id: int, db: Session = Depends(get_db),
         "grade_distribution": grade_distribution,
     }
 
-
-@app.get("/")
-def root():
-    return {"message": "School Grading System API is running"}
+@app.get("/marks/exam/{exam_id}", response_model=List[schemas.MarkOut])
+def get_all_marks_for_exam(exam_id: int, db: Session = Depends(get_db),
+                            current_user: models.User = Depends(auth.get_current_user)):
+    """All marks for every student in a given exam — used for the spreadsheet-style entry table."""
+    return db.query(models.Mark).filter(models.Mark.exam_id == exam_id).all()
