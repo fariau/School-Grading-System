@@ -112,6 +112,10 @@ def delete_class(class_id: int, db: Session = Depends(get_db),
     obj = db.query(models.SchoolClass).filter(models.SchoolClass.id == class_id).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Class not found")
+
+    db.query(models.Exam).filter(models.Exam.class_id == class_id).delete()
+    db.query(models.Student).filter(models.Student.class_id == class_id).delete()
+
     db.delete(obj)
     db.commit()
     return {"detail": "Class deleted"}

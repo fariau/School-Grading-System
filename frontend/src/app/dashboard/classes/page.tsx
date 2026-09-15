@@ -16,17 +16,17 @@ const DEFAULT_SUBJECTS_FOR_NEW_CLASS = [
   "English", "Urdu", "Mathematics", "Science", "Social Studies", "Islamiat",
 ];
 
-type TabKey = "sessions" | "classes" | "sections" | "subjects" | "exams";
+const DEFAULT_SESSION_LABEL = "Current Session";
+
+type TabKey = "classes" | "sections" | "subjects" | "exams";
 
 const TABS: { key: TabKey; label: string }[] = [
-  { key: "sessions", label: "Sessions" },
   { key: "classes", label: "Classes" },
   { key: "sections", label: "Sections" },
   { key: "subjects", label: "Subjects" },
   { key: "exams", label: "Exams" },
 ];
 
-// Helper: normalize text for duplicate comparisons (case + extra spaces don't matter)
 function normalize(text: string) {
   return text.trim().toLowerCase();
 }
@@ -47,10 +47,8 @@ export default function ClassesPage() {
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [customSubject, setCustomSubject] = useState("");
   const [passingPercent, setPassingPercent] = useState("33");
-  const [sessionLabel, setSessionLabel] = useState("");
   const [examName, setExamName] = useState("");
   const [examClassId, setExamClassId] = useState<number | "">("");
-  const [examSessionId, setExamSessionId] = useState<number | "">("");
   const [addingClass, setAddingClass] = useState(false);
 
   function refreshAll() {
@@ -62,6 +60,19 @@ export default function ClassesPage() {
   }
 
   useEffect(refreshAll, []);
+
+  // Get (or silently create) the one default session everything uses behind the scenes
+  async function getDefaultSessionId(): Promise<number> {
+    const existing = sessions.find((s) => normalize(s.year_label) === normalize(DEFAULT_SESSION_LABEL));
+    if (existing) return existing.id;
+
+    const res = await api.post<AcademicSession>("/sessions", {
+      year_label: DEFAULT_SESSION_LABEL,
+      is_active: true,
+    });
+    setSessions((prev) => [...prev, res.data]);
+    return res.data.id;
+  }
 
   async function addClass(e: React.FormEvent) {
     e.preventDefault();
@@ -121,7 +132,6 @@ export default function ClassesPage() {
     if (customSubject.trim()) allToAdd.push(customSubject.trim());
     if (allToAdd.length === 0) return;
 
-    // Skip anything that's already a subject for this class
     const existingNames = subjects
       .filter((s) => s.class_id === subjectClassId)
       .map((s) => normalize(s.name));
@@ -142,24 +152,9 @@ export default function ClassesPage() {
     refreshAll();
   }
 
-  async function addSession(e: React.FormEvent) {
-    e.preventDefault();
-    if (!sessionLabel.trim()) return;
-
-    const isDuplicate = sessions.some((s) => normalize(s.year_label) === normalize(sessionLabel));
-    if (isDuplicate) {
-      alert("This session already exists.");
-      return;
-    }
-
-    await api.post("/sessions", { year_label: sessionLabel.trim(), is_active: true });
-    setSessionLabel("");
-    refreshAll();
-  }
-
   async function addExam(e: React.FormEvent) {
     e.preventDefault();
-    if (!examName.trim() || !examClassId || !examSessionId) return;
+    if (!examName.trim() || !examClassId) return;
 
     const isDuplicate = exams.some(
       (ex) => ex.class_id === examClassId && normalize(ex.name) === normalize(examName)
@@ -169,14 +164,14 @@ export default function ClassesPage() {
       return;
     }
 
-    await api.post("/exams", { name: examName.trim(), class_id: examClassId, session_id: examSessionId });
+    const sessionId = await getDefaultSessionId();
+    await api.post("/exams", { name: examName.trim(), class_id: examClassId, session_id: sessionId });
     setExamName("");
     refreshAll();
   }
 
   async function handleDelete(kind: TabKey, id: number) {
     const endpoints: Record<TabKey, string> = {
-      sessions: "sessions",
       classes: "classes",
       sections: "sections",
       subjects: "subjects",
@@ -211,26 +206,6 @@ export default function ClassesPage() {
           </button>
         ))}
       </div>
-
-      {activeTab === "sessions" && (
-        <Panel>
-          <form onSubmit={addSession} className="flex gap-2 mb-5">
-            <input
-              value={sessionLabel}
-              onChange={(e) => setSessionLabel(e.target.value)}
-              placeholder="e.g. 2025-2026"
-              className="flex-1 border border-hairline rounded-md px-3 py-2 text-sm bg-paper"
-            />
-            <AddButton />
-          </form>
-          <DataTable
-            headers={["Session"]}
-            rows={sessions.map((s) => ({ id: s.id, cells: [s.year_label] }))}
-            onDelete={(id) => handleDelete("sessions", id)}
-            emptyText="No academic sessions yet."
-          />
-        </Panel>
-      )}
 
       {activeTab === "classes" && (
         <Panel>
@@ -364,7 +339,7 @@ export default function ClassesPage() {
 
       {activeTab === "exams" && (
         <Panel>
-          <form onSubmit={addExam} className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-5">
+          <form onSubmit={addExam} className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-5">
             <input
               value={examName}
               onChange={(e) => setExamName(e.target.value)}
@@ -381,27 +356,13 @@ export default function ClassesPage() {
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-            <select
-              value={examSessionId}
-              onChange={(e) => setExamSessionId(Number(e.target.value))}
-              className="border border-hairline rounded-md px-3 py-2 text-sm bg-paper"
-            >
-              <option value="">Select session</option>
-              {sessions.map((s) => (
-                <option key={s.id} value={s.id}>{s.year_label}</option>
-              ))}
-            </select>
             <AddButton />
           </form>
           <DataTable
-            headers={["Exam", "Class", "Session"]}
+            headers={["Exam", "Class"]}
             rows={exams.map((ex) => ({
               id: ex.id,
-              cells: [
-                ex.name,
-                classes.find((c) => c.id === ex.class_id)?.name ?? "—",
-                sessions.find((s) => s.id === ex.session_id)?.year_label ?? "—",
-              ],
+              cells: [ex.name, classes.find((c) => c.id === ex.class_id)?.name ?? "—"],
             }))}
             onDelete={(id) => handleDelete("exams", id)}
             emptyText="No exams yet."

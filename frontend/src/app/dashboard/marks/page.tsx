@@ -13,8 +13,8 @@ export default function MarksEntryPage() {
   const [classId, setClassId] = useState<number | "">("");
   const [examId, setExamId] = useState<number | "">("");
 
-  // grid[studentId][subjectId] = obtained marks (as string, for the input)
-  const [grid, setGrid] = useState<Record<number, Record<number, string>>>({});
+  // grid[studentId][subjectId] = { obtained, total }
+  const [grid, setGrid] = useState<Record<number, Record<number, { obtained: string; total: string }>>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loadingGrid, setLoadingGrid] = useState(false);
@@ -36,7 +36,6 @@ export default function MarksEntryPage() {
     api.get<Subject[]>("/subjects", { params: { class_id: classId } }).then((r) => setSubjects(r.data));
   }, [classId]);
 
-  // Load the whole grid at once when class + exam are both picked
   useEffect(() => {
     if (!examId || students.length === 0 || subjects.length === 0) {
       setGrid({});
@@ -44,14 +43,17 @@ export default function MarksEntryPage() {
     }
     setLoadingGrid(true);
     api.get<Mark[]>(`/marks/exam/${examId}`).then((res) => {
-      const newGrid: Record<number, Record<number, string>> = {};
+      const newGrid: Record<number, Record<number, { obtained: string; total: string }>> = {};
       for (const student of students) {
         newGrid[student.id] = {};
         for (const subject of subjects) {
           const existing = res.data.find(
             (m) => m.student_id === student.id && m.subject_id === subject.id
           );
-          newGrid[student.id][subject.id] = existing ? String(existing.obtained_marks) : "";
+          newGrid[student.id][subject.id] = {
+            obtained: existing ? String(existing.obtained_marks) : "",
+            total: existing ? String(existing.total_marks) : "100",
+          };
         }
       }
       setGrid(newGrid);
@@ -59,11 +61,29 @@ export default function MarksEntryPage() {
     });
   }, [examId, students, subjects]);
 
-  function updateCell(studentId: number, subjectId: number, value: string) {
+  function updateObtained(studentId: number, subjectId: number, value: string) {
     setGrid((prev) => ({
       ...prev,
-      [studentId]: { ...prev[studentId], [subjectId]: value },
+      [studentId]: {
+        ...prev[studentId],
+        [subjectId]: { ...prev[studentId]?.[subjectId], obtained: value, total: prev[studentId]?.[subjectId]?.total ?? "100" },
+      },
     }));
+  }
+
+  // Setting a subject's total marks once applies it to every student in the table
+  function updateTotalForSubject(subjectId: number, value: string) {
+    setGrid((prev) => {
+      const next = { ...prev };
+      for (const studentId of Object.keys(next)) {
+        const sId = Number(studentId);
+        next[sId] = {
+          ...next[sId],
+          [subjectId]: { ...next[sId][subjectId], total: value },
+        };
+      }
+      return next;
+    });
   }
 
   async function handleSaveAll() {
@@ -75,8 +95,8 @@ export default function MarksEntryPage() {
         students.map((student) => {
           const marksForStudent = subjects.map((subject) => ({
             subject_id: subject.id,
-            total_marks: 100,
-            obtained_marks: Number(grid[student.id]?.[subject.id]) || 0,
+            total_marks: Number(grid[student.id]?.[subject.id]?.total) || 100,
+            obtained_marks: Number(grid[student.id]?.[subject.id]?.obtained) || 0,
           }));
           return api.post("/marks/bulk", {
             student_id: student.id,
@@ -90,6 +110,12 @@ export default function MarksEntryPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // The total marks currently set for a subject (reads from the first student's row)
+  function getSubjectTotal(subjectId: number): string {
+    const firstStudentId = students[0]?.id;
+    return grid[firstStudentId]?.[subjectId]?.total ?? "100";
   }
 
   return (
@@ -143,13 +169,34 @@ export default function MarksEntryPage() {
 
       {!loadingGrid && examId && students.length > 0 && subjects.length > 0 && (
         <div className="border border-hairline rounded-lg bg-paper-raised overflow-hidden">
+          <div className="px-4 pt-4">
+            <p className="text-xs text-muted mb-2">
+              Set the total marks for each subject once — it applies to the whole class.
+            </p>
+            <div className="flex flex-wrap gap-4 mb-4">
+              {subjects.map((subject) => (
+                <div key={subject.id} className="flex items-center gap-1.5">
+                  <label className="text-xs text-ink-soft whitespace-nowrap">{subject.name} total:</label>
+                  <input
+                    type="number"
+                    value={getSubjectTotal(subject.id)}
+                    onChange={(e) => updateTotalForSubject(subject.id, e.target.value)}
+                    className="w-16 border border-hairline rounded-md px-2 py-1 text-xs bg-paper"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="ledger-table">
               <thead>
                 <tr>
                   <th className="sticky left-0 bg-paper-raised">Student</th>
                   {subjects.map((s) => (
-                    <th key={s.id} className="whitespace-nowrap">{s.name}</th>
+                    <th key={s.id} className="whitespace-nowrap">
+                      {s.name} <span className="text-muted font-normal">(/ {getSubjectTotal(s.id)})</span>
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -161,13 +208,18 @@ export default function MarksEntryPage() {
                     </td>
                     {subjects.map((subject) => (
                       <td key={subject.id}>
-                        <input
-                          type="number"
-                          value={grid[student.id]?.[subject.id] ?? ""}
-                          onChange={(e) => updateCell(student.id, subject.id, e.target.value)}
-                          placeholder="0"
-                          className="w-16 border border-hairline rounded-md px-2 py-1.5 text-sm bg-paper"
-                        />
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            value={grid[student.id]?.[subject.id]?.obtained ?? ""}
+                            onChange={(e) => updateObtained(student.id, subject.id, e.target.value)}
+                            placeholder="0"
+                            className="w-16 border border-hairline rounded-md px-2 py-1.5 text-sm bg-paper"
+                          />
+                          <span className="text-xs text-muted whitespace-nowrap">
+                            / {grid[student.id]?.[subject.id]?.total ?? "100"}
+                          </span>
+                        </div>
                       </td>
                     ))}
                   </tr>

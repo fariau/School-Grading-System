@@ -27,28 +27,70 @@ const GRADE_COLORS: Record<string, string> = {
   F: "#B23A2E",
 };
 
+function normalize(text: string) {
+  return text.trim().toLowerCase();
+}
+
 export default function OverviewPage() {
   const [exams, setExams] = useState<Exam[]>([]);
-  const [selectedExam, setSelectedExam] = useState<number | null>(null);
+  const [selectedExamName, setSelectedExamName] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.get<Exam[]>("/exams").then((res) => {
       setExams(res.data);
-      if (res.data.length > 0) setSelectedExam(res.data[0].id);
+      if (res.data.length > 0) setSelectedExamName(res.data[0].name);
       else setLoading(false);
     });
   }, []);
 
+  // Unique exam names across all classes (e.g. "Mid Term", "Final Term")
+  const uniqueExamNames = Array.from(
+    new Map(exams.map((ex) => [normalize(ex.name), ex.name])).values()
+  );
+
   useEffect(() => {
-    if (selectedExam === null) return;
+    if (!selectedExamName) return;
     setLoading(true);
-    api
-      .get<DashboardStats>(`/dashboard/exam/${selectedExam}`)
-      .then((res) => setStats(res.data))
-      .finally(() => setLoading(false));
-  }, [selectedExam]);
+
+    // Every exam (in any class) that matches this name
+    const matchingExams = exams.filter(
+      (ex) => normalize(ex.name) === normalize(selectedExamName)
+    );
+
+    Promise.all(
+      matchingExams.map((ex) => api.get<DashboardStats>(`/dashboard/exam/${ex.id}`))
+    ).then((responses) => {
+      const allStats = responses.map((r) => r.data);
+
+      // Combine stats from every class into one overall picture
+      const combined: DashboardStats = {
+        total_students: allStats.reduce((sum, s) => sum + s.total_students, 0),
+        passed: allStats.reduce((sum, s) => sum + s.passed, 0),
+        failed: allStats.reduce((sum, s) => sum + s.failed, 0),
+        highest_marks: Math.max(0, ...allStats.map((s) => s.highest_marks)),
+        class_average: 0,
+        grade_distribution: {},
+      };
+
+      const totalForAvg = allStats.reduce((sum, s) => sum + s.total_students, 0);
+      const weightedSum = allStats.reduce(
+        (sum, s) => sum + s.class_average * s.total_students,
+        0
+      );
+      combined.class_average = totalForAvg > 0 ? Math.round((weightedSum / totalForAvg) * 100) / 100 : 0;
+
+      for (const s of allStats) {
+        for (const [grade, count] of Object.entries(s.grade_distribution)) {
+          combined.grade_distribution[grade] = (combined.grade_distribution[grade] || 0) + count;
+        }
+      }
+
+      setStats(combined);
+      setLoading(false);
+    });
+  }, [selectedExamName, exams]);
 
   const gradeData = GRADE_ORDER.map((g) => ({
     grade: g,
@@ -61,19 +103,19 @@ export default function OverviewPage() {
         <div>
           <h1 className="font-serif text-2xl font-semibold text-ink">Overview</h1>
           <p className="text-sm text-muted mt-1">
-            Class performance at a glance
+            Combined performance across all classes
           </p>
         </div>
 
-        {exams.length > 0 && (
+        {uniqueExamNames.length > 0 && (
           <select
-            value={selectedExam ?? ""}
-            onChange={(e) => setSelectedExam(Number(e.target.value))}
+            value={selectedExamName ?? ""}
+            onChange={(e) => setSelectedExamName(e.target.value)}
             className="border border-hairline rounded-md px-3 py-2 text-sm bg-paper-raised"
           >
-            {exams.map((exam) => (
-              <option key={exam.id} value={exam.id}>
-                {exam.name}
+            {uniqueExamNames.map((name) => (
+              <option key={name} value={name}>
+                {name}
               </option>
             ))}
           </select>

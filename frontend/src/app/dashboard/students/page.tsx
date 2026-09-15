@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Student, SchoolClass, Section, AcademicSession } from "@/lib/types";
 
+const DEFAULT_SESSION_LABEL = "Current Session";
+
+function normalize(text: string) {
+  return text.trim().toLowerCase();
+}
+
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
@@ -14,7 +20,6 @@ export default function StudentsPage() {
   const [rollNo, setRollNo] = useState("");
   const [classId, setClassId] = useState<number | "">("");
   const [sectionId, setSectionId] = useState<number | "">("");
-  const [sessionId, setSessionId] = useState<number | "">("");
   const [editingId, setEditingId] = useState<number | null>(null);
 
   function refresh() {
@@ -26,18 +31,31 @@ export default function StudentsPage() {
 
   useEffect(refresh, []);
 
+  async function getDefaultSessionId(): Promise<number> {
+    const existing = sessions.find((s) => normalize(s.year_label) === normalize(DEFAULT_SESSION_LABEL));
+    if (existing) return existing.id;
+
+    const res = await api.post<AcademicSession>("/sessions", {
+      year_label: DEFAULT_SESSION_LABEL,
+      is_active: true,
+    });
+    setSessions((prev) => [...prev, res.data]);
+    return res.data.id;
+  }
+
   function resetForm() {
     setName("");
     setRollNo("");
     setClassId("");
     setSectionId("");
-    setSessionId("");
     setEditingId(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !rollNo.trim() || !classId || !sectionId || !sessionId) return;
+    if (!name.trim() || !rollNo.trim() || !classId || !sectionId) return;
+
+    const sessionId = await getDefaultSessionId();
 
     const payload = {
       name,
@@ -62,7 +80,6 @@ export default function StudentsPage() {
     setRollNo(s.roll_no);
     setClassId(s.class_id);
     setSectionId(s.section_id);
-    setSessionId(s.session_id);
   }
 
   async function handleDelete(id: number) {
@@ -129,21 +146,6 @@ export default function StudentsPage() {
             {filteredSections.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-xs text-muted mb-1.5">Session</label>
-          <select
-            value={sessionId}
-            onChange={(e) => setSessionId(Number(e.target.value))}
-            className="w-full border border-hairline rounded-md px-3 py-2 text-sm bg-paper"
-          >
-            <option value="">Select</option>
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.year_label}
               </option>
             ))}
           </select>

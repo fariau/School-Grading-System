@@ -28,7 +28,10 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.teacher, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    teacher_profile = relationship("Teacher", back_populates="user", uselist=False)
+    teacher_profile = relationship(
+        "Teacher", back_populates="user", uselist=False,
+        cascade="all, delete-orphan"
+    )
 
 
 class AcademicSession(Base):
@@ -36,11 +39,15 @@ class AcademicSession(Base):
     __tablename__ = "academic_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    year_label = Column(String, nullable=False)  # e.g. "2025-2026"
+    year_label = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
 
-    students = relationship("Student", back_populates="session")
-    exams = relationship("Exam", back_populates="session")
+    students = relationship(
+        "Student", back_populates="session", cascade="all, delete-orphan"
+    )
+    exams = relationship(
+        "Exam", back_populates="session", cascade="all, delete-orphan"
+    )
 
 
 class SchoolClass(Base):
@@ -48,10 +55,15 @@ class SchoolClass(Base):
     __tablename__ = "classes"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)  # e.g. "Class 9"
+    name = Column(String, nullable=False)
 
-    sections = relationship("Section", back_populates="school_class")
-    subjects = relationship("Subject", back_populates="school_class")
+    # Deleting a class removes everything under it
+    sections = relationship(
+        "Section", back_populates="school_class", cascade="all, delete-orphan"
+    )
+    subjects = relationship(
+        "Subject", back_populates="school_class", cascade="all, delete-orphan"
+    )
 
 
 class Section(Base):
@@ -59,11 +71,13 @@ class Section(Base):
     __tablename__ = "sections"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)  # e.g. "A"
+    name = Column(String, nullable=False)
     class_id = Column(Integer, ForeignKey("classes.id"), nullable=False)
 
     school_class = relationship("SchoolClass", back_populates="sections")
-    students = relationship("Student", back_populates="section")
+    students = relationship(
+        "Student", back_populates="section", cascade="all, delete-orphan"
+    )
 
 
 class Subject(Base):
@@ -71,13 +85,17 @@ class Subject(Base):
     __tablename__ = "subjects"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)  # e.g. "Mathematics"
+    name = Column(String, nullable=False)
     class_id = Column(Integer, ForeignKey("classes.id"), nullable=False)
-    passing_marks_percent = Column(Float, default=33.0)  # min % to pass this subject
+    passing_marks_percent = Column(Float, default=33.0)
 
     school_class = relationship("SchoolClass", back_populates="subjects")
-    marks = relationship("Mark", back_populates="subject")
-    teacher_links = relationship("TeacherSubject", back_populates="subject")
+    marks = relationship(
+        "Mark", back_populates="subject", cascade="all, delete-orphan"
+    )
+    teacher_links = relationship(
+        "TeacherSubject", back_populates="subject", cascade="all, delete-orphan"
+    )
 
 
 class Teacher(Base):
@@ -88,7 +106,9 @@ class Teacher(Base):
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
 
     user = relationship("User", back_populates="teacher_profile")
-    subject_links = relationship("TeacherSubject", back_populates="teacher")
+    subject_links = relationship(
+        "TeacherSubject", back_populates="teacher", cascade="all, delete-orphan"
+    )
 
 
 class TeacherSubject(Base):
@@ -116,8 +136,12 @@ class Student(Base):
 
     section = relationship("Section", back_populates="students")
     session = relationship("AcademicSession", back_populates="students")
-    marks = relationship("Mark", back_populates="student")
-    results = relationship("Result", back_populates="student")
+    marks = relationship(
+        "Mark", back_populates="student", cascade="all, delete-orphan"
+    )
+    results = relationship(
+        "Result", back_populates="student", cascade="all, delete-orphan"
+    )
 
 
 class Exam(Base):
@@ -125,13 +149,17 @@ class Exam(Base):
     __tablename__ = "exams"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)  # e.g. "Mid Term 2025"
+    name = Column(String, nullable=False)
     class_id = Column(Integer, ForeignKey("classes.id"), nullable=False)
     session_id = Column(Integer, ForeignKey("academic_sessions.id"), nullable=False)
 
     session = relationship("AcademicSession", back_populates="exams")
-    marks = relationship("Mark", back_populates="exam")
-    results = relationship("Result", back_populates="exam")
+    marks = relationship(
+        "Mark", back_populates="exam", cascade="all, delete-orphan"
+    )
+    results = relationship(
+        "Result", back_populates="exam", cascade="all, delete-orphan"
+    )
 
 
 class Mark(Base):
@@ -162,7 +190,7 @@ class Result(Base):
     percentage = Column(Float, nullable=False)
     grade = Column(String, nullable=False)
     position = Column(Integer, nullable=True)
-    status = Column(String, nullable=False)  # "Pass" or "Fail"
+    status = Column(String, nullable=False)
     remarks = Column(Text, nullable=True)
 
     student = relationship("Student", back_populates="results")
