@@ -27,15 +27,6 @@ function generateAutoRemark(grade: string, percentage: number, status: string): 
   return "Result recorded.";
 }
 
-// Passing threshold used only to derive a per-subject Pass/Fail label for the
-// printed report card. Adjust PASS_PERCENT if your school uses a different cutoff.
-const PASS_PERCENT = 33;
-
-function subjectStatus(obtained: number, total: number): "Pass" | "Fail" {
-  if (total <= 0) return "Pass";
-  return (obtained / total) * 100 >= PASS_PERCENT ? "Pass" : "Fail";
-}
-
 export default function ResultsPage() {
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
@@ -99,6 +90,12 @@ export default function ResultsPage() {
 
   function subjectName(subjectId: number) {
     return subjects.find((s) => s.id === subjectId)?.name ?? "Subject";
+  }
+
+  function subjectStatus(subjectId: number, obtained: number, total: number): "Pass" | "Fail" {
+    if (total <= 0) return "Pass";
+    const passPercent = subjects.find((s) => s.id === subjectId)?.passing_marks_percent ?? 33;
+    return (obtained / total) * 100 >= passPercent ? "Pass" : "Fail";
   }
 
   const examName = exams.find((e) => e.id === examId)?.name ?? "";
@@ -349,7 +346,7 @@ export default function ResultsPage() {
                       <td className="cell-subject">{subjectName(m.subject_id).toUpperCase()}</td>
                       <td className="cell-num">{m.total_marks}</td>
                       <td className="cell-num">{m.obtained_marks}</td>
-                      <td className="cell-status">{subjectStatus(m.obtained_marks, m.total_marks)}</td>
+                      <td className="cell-status">{subjectStatus(m.subject_id, m.obtained_marks, m.total_marks)}</td>
                     </tr>
                   ))}
                   <tr className="total-row">
