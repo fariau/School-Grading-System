@@ -13,7 +13,7 @@ export default function MarksEntryPage() {
   const [classId, setClassId] = useState<number | "">("");
   const [examId, setExamId] = useState<number | "">("");
 
-  // grid[studentId][subjectId] = { obtained, total }
+  // grid[subjectId][studentId] = { obtained, total }
   const [grid, setGrid] = useState<Record<number, Record<number, { obtained: string; total: string }>>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -44,13 +44,13 @@ export default function MarksEntryPage() {
     setLoadingGrid(true);
     api.get<Mark[]>(`/marks/exam/${examId}`).then((res) => {
       const newGrid: Record<number, Record<number, { obtained: string; total: string }>> = {};
-      for (const student of students) {
-        newGrid[student.id] = {};
-        for (const subject of subjects) {
+      for (const subject of subjects) {
+        newGrid[subject.id] = {};
+        for (const student of students) {
           const existing = res.data.find(
             (m) => m.student_id === student.id && m.subject_id === subject.id
           );
-          newGrid[student.id][subject.id] = {
+          newGrid[subject.id][student.id] = {
             obtained: existing ? String(existing.obtained_marks) : "",
             total: existing ? String(existing.total_marks) : "100",
           };
@@ -61,29 +61,30 @@ export default function MarksEntryPage() {
     });
   }, [examId, students, subjects]);
 
-  function updateObtained(studentId: number, subjectId: number, value: string) {
+  function updateObtained(subjectId: number, studentId: number, value: string) {
     setGrid((prev) => ({
       ...prev,
-      [studentId]: {
-        ...prev[studentId],
-        [subjectId]: { ...prev[studentId]?.[subjectId], obtained: value, total: prev[studentId]?.[subjectId]?.total ?? "100" },
+      [subjectId]: {
+        ...prev[subjectId],
+        [studentId]: { ...prev[subjectId]?.[studentId], obtained: value, total: prev[subjectId]?.[studentId]?.total ?? "100" },
       },
     }));
   }
 
-  // Setting a subject's total marks once applies it to every student in the table
+  // Setting a subject's total marks once applies it to every student in that row
   function updateTotalForSubject(subjectId: number, value: string) {
     setGrid((prev) => {
-      const next = { ...prev };
-      for (const studentId of Object.keys(next)) {
-        const sId = Number(studentId);
-        next[sId] = {
-          ...next[sId],
-          [subjectId]: { ...next[sId][subjectId], total: value },
-        };
+      const row = { ...prev[subjectId] };
+      for (const studentId of Object.keys(row)) {
+        row[Number(studentId)] = { ...row[Number(studentId)], total: value };
       }
-      return next;
+      return { ...prev, [subjectId]: row };
     });
+  }
+
+  function getSubjectTotal(subjectId: number): string {
+    const firstStudentId = students[0]?.id;
+    return grid[subjectId]?.[firstStudentId]?.total ?? "100";
   }
 
   async function handleSaveAll() {
@@ -95,8 +96,8 @@ export default function MarksEntryPage() {
         students.map((student) => {
           const marksForStudent = subjects.map((subject) => ({
             subject_id: subject.id,
-            total_marks: Number(grid[student.id]?.[subject.id]?.total) || 100,
-            obtained_marks: Number(grid[student.id]?.[subject.id]?.obtained) || 0,
+            total_marks: Number(grid[subject.id]?.[student.id]?.total) || 100,
+            obtained_marks: Number(grid[subject.id]?.[student.id]?.obtained) || 0,
           }));
           return api.post("/marks/bulk", {
             student_id: student.id,
@@ -110,12 +111,6 @@ export default function MarksEntryPage() {
     } finally {
       setSaving(false);
     }
-  }
-
-  // The total marks currently set for a subject (reads from the first student's row)
-  function getSubjectTotal(subjectId: number): string {
-    const firstStudentId = students[0]?.id;
-    return grid[firstStudentId]?.[subjectId]?.total ?? "100";
   }
 
   return (
@@ -169,57 +164,42 @@ export default function MarksEntryPage() {
 
       {!loadingGrid && examId && students.length > 0 && subjects.length > 0 && (
         <div className="border border-hairline rounded-lg bg-paper-raised overflow-hidden">
-          <div className="px-4 pt-4">
-            <p className="text-xs text-muted mb-2">
-              Set the total marks for each subject once — it applies to the whole class.
-            </p>
-            <div className="flex flex-wrap gap-4 mb-4">
-              {subjects.map((subject) => (
-                <div key={subject.id} className="flex items-center gap-1.5">
-                  <label className="text-xs text-ink-soft whitespace-nowrap">{subject.name} total:</label>
-                  <input
-                    type="number"
-                    value={getSubjectTotal(subject.id)}
-                    onChange={(e) => updateTotalForSubject(subject.id, e.target.value)}
-                    className="w-16 border border-hairline rounded-md px-2 py-1 text-xs bg-paper"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
           <div className="overflow-x-auto">
             <table className="ledger-table">
               <thead>
                 <tr>
-                  <th className="sticky left-0 bg-paper-raised">Student</th>
-                  {subjects.map((s) => (
-                    <th key={s.id} className="whitespace-nowrap">
-                      {s.name} <span className="text-muted font-normal">(/ {getSubjectTotal(s.id)})</span>
+                  <th className="sticky left-0 bg-paper-raised whitespace-nowrap">Subject</th>
+                  <th className="whitespace-nowrap">Total Marks</th>
+                  {students.map((student) => (
+                    <th key={student.id} className="whitespace-nowrap">
+                      {student.roll_no} — {student.name}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {students.map((student) => (
-                  <tr key={student.id}>
+                {subjects.map((subject) => (
+                  <tr key={subject.id}>
                     <td className="sticky left-0 bg-paper-raised font-medium whitespace-nowrap">
-                      {student.roll_no} — {student.name}
+                      {subject.name}
                     </td>
-                    {subjects.map((subject) => (
-                      <td key={subject.id}>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            value={grid[student.id]?.[subject.id]?.obtained ?? ""}
-                            onChange={(e) => updateObtained(student.id, subject.id, e.target.value)}
-                            placeholder="0"
-                            className="w-16 border border-hairline rounded-md px-2 py-1.5 text-sm bg-paper"
-                          />
-                          <span className="text-xs text-muted whitespace-nowrap">
-                            / {grid[student.id]?.[subject.id]?.total ?? "100"}
-                          </span>
-                        </div>
+                    <td>
+                      <input
+                        type="number"
+                        value={getSubjectTotal(subject.id)}
+                        onChange={(e) => updateTotalForSubject(subject.id, e.target.value)}
+                        className="w-16 border border-hairline rounded-md px-2 py-1.5 text-sm bg-paper"
+                      />
+                    </td>
+                    {students.map((student) => (
+                      <td key={student.id}>
+                        <input
+                          type="number"
+                          value={grid[subject.id]?.[student.id]?.obtained ?? ""}
+                          onChange={(e) => updateObtained(subject.id, student.id, e.target.value)}
+                          placeholder="0"
+                          className="w-16 border border-hairline rounded-md px-2 py-1.5 text-sm bg-paper"
+                        />
                       </td>
                     ))}
                   </tr>

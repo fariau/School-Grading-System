@@ -1,18 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --paper: #F8FAFC;
+  --paper: #FAFAF7;
   --paper-raised: #FFFFFF;
-  --ink: #0F172A;
-  --ink-soft: #334155;
-  --muted: #64748B;
-  --hairline: #E2E8F0;
-  --ledger-green: #2563EB;
-  --ledger-green-soft: #DBEAFE;
-  --pen-red: #DC2626;
-  --pen-red-soft: #FEE2E2;
-  --gold: #D97706;
-  --gold-soft: #FEF3C7;
+  --ink: #1C2B39;
+  --ink-soft: #4A5A68;
+  --muted: #6B7280;
+  --hairline: #E4E1D8;
+  --ledger-green: #2F6F4E;
+  --ledger-green-soft: #E7F0EA;
+  --pen-red: #B23A2E;
+  --pen-red-soft: #FBEAE8;
+  --gold: #B8860B;
+  --gold-soft: #F7EFDD;
 }
 
 @theme inline {
@@ -28,7 +28,7 @@
   --color-pen-red-soft: var(--pen-red-soft);
   --color-gold: var(--gold);
   --color-gold-soft: var(--gold-soft);
-  --font-serif: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
@@ -75,4 +75,5 @@ body {
   font-family: var(--font-serif);
   font-weight: 600;
   font-size: 1rem;
+  transform: rotate(-4deg);
 }
